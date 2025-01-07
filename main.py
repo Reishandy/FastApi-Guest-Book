@@ -28,13 +28,13 @@ app = FastAPI(lifespan=lifespan)
     responses={
         status.HTTP_200_OK: {
             "description": "Successful response",
-            "content": {"application/json": {"example": {"message": "Hello World"}}},
+            "content": {"application/json": {"example": {"message": "ok"}}},
         }})
 async def root():
     """
     Root endpoint, used to test the connection to the API.
     """
-    return {"message": "Connection established"}
+    return {"message": "ok"}
 
 
 # DATA ENDPOINTS
@@ -48,7 +48,7 @@ async def root():
         },
         status.HTTP_400_BAD_REQUEST: {
             "description": "Bad request",
-            "content": {"application/json": {"example": {"detail": "File must be a CSV"}}},
+            "content": {"application/json": {"example": {"detail": "Validation error"}}},
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
