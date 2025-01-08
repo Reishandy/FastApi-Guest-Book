@@ -1,13 +1,11 @@
-import asyncio
 import json
 from contextlib import asynccontextmanager
-from pickle import GLOBAL
 
 from fastapi import FastAPI, status, UploadFile, HTTPException
 from starlette.responses import StreamingResponse
 from starlette.websockets import WebSocket
 
-import database as db_handler
+import app.database as db_handler
 
 
 # === FASTAPI ===z

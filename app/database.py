@@ -1,15 +1,15 @@
 import json
+from csv import DictReader, writer
 from datetime import datetime
+from io import StringIO
 from os import getenv
 from urllib.parse import quote_plus
-from csv import DictReader, writer
-from io import StringIO
 
 from bson import InvalidDocument
+from dotenv import load_dotenv
 from fastapi import UploadFile
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClient
 from pymongo.errors import OperationFailure, DuplicateKeyError
-from dotenv import load_dotenv
 from starlette.websockets import WebSocket
 
 # Load the environment variables
