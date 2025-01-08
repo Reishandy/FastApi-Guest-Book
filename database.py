@@ -1,3 +1,5 @@
+import json
+from datetime import datetime
 from os import getenv
 from urllib.parse import quote_plus
 from csv import DictReader, writer
@@ -8,6 +10,7 @@ from fastapi import UploadFile
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClient
 from pymongo.errors import OperationFailure, DuplicateKeyError
 from dotenv import load_dotenv
+from starlette.websockets import WebSocket
 
 # Load the environment variables
 load_dotenv()
@@ -83,22 +86,26 @@ async def import_csv(file: UploadFile) -> int:
     # Parse the rows and filter out existing entries
     documents = []
     for row in csv_reader:
-        nim = row["nim"].strip()
+        nim = row["nim"]
         if nim in existing_nims_set:
             continue  # Skip if the entry already exists
 
         documents.append({
-            "nim": nim,
-            "name": row["name"].strip(),
-            "address": row["address"].strip(),
-            "phone_number": row["phone_number"].strip(),
-            "email": row["email"].strip(),
-            "major": row["major"].strip(),
-            "study_program": row["study_program"].strip(),
-            "generation": row["generation"].strip(),
-            "status": row["status"].strip(),
-            "check_in": row.get("check_in", "").strip() or False,
-            "checked_in_at": row.get("checked_in_at", "").strip() or None
+            "nim": nim, # This is the ID used to identify entry and used to check in
+
+            # This data is can be changed or removed entirely
+            "name": row["name"],
+            "address": row["address"],
+            "phone_number": row["phone_number"],
+            "email": row["email"],
+            "major": row["major"],
+            "study_program": row["study_program"],
+            "generation": row["generation"],
+            "status": row["status"],
+
+            # This is check in data
+            "check_in": row.get("check_in", "") or False,
+            "checked_in_at": row.get("checked_in_at", "") or None
         })
 
     # Insert the documents into the database
@@ -152,3 +159,98 @@ async def export_csv() -> StringIO:
 
     output.seek(0) # Move the cursor to the beginning of the file
     return output
+
+
+async def check_in(entry_id: str) -> str:
+    """
+    Check in the given ID, and returning the check in time.
+
+    :param entry_id: The ID to check in.
+    :return: The check in time.
+    :raises ValueError: If the ID is not found.
+    :raises RuntimeError: If there is an error doing the database operation.
+    """
+    global DB
+
+    # Find the entry with the given ID
+    try:
+        entry = await DB.entry.find_one({"nim": entry_id})
+    except (ConnectionError, OperationFailure) as e:
+        raise RuntimeError(f"Database query error: {str(e)}")
+
+    # Check if the entry exists
+    if not entry:
+        raise ValueError("ID not found")
+
+    # Check in the student
+    try:
+        time = datetime.now().isoformat()
+        await DB.entry.update_one({"nim": entry_id}, {"$set": {"check_in": True, "checked_in_at": time}})
+        return time
+    except (ConnectionError, OperationFailure) as e:
+        raise RuntimeError(f"Database update error: {str(e)}")
+
+
+async def reset_check_in(entry_id: str = None) -> int:
+    """
+    Reset the check in status of the given ID, or all entries.
+
+    If entry_id is None, reset all entries.
+
+    :param entry_id: The ID to reset, or None to reset all entries.
+    :return: The number of entries reset.
+    :raises ValueError: If the ID is not found.
+    :raises RuntimeError: If there is an error doing the database operation.
+    """
+    global DB
+
+    if entry_id:
+        # Find the entry with the given ID
+        try:
+            entry = await DB.entry.find_one({"nim": entry_id})
+        except (ConnectionError, OperationFailure) as e:
+            raise RuntimeError(f"Database query error: {str(e)}")
+
+        # Check if the entry exists
+        if not entry:
+            raise ValueError("ID not found")
+
+        # Reset the check in status
+        try:
+            await DB.entry.update_one({"nim": entry_id}, {"$set": {"check_in": False, "checked_in_at": None}})
+            return 1
+        except (ConnectionError, OperationFailure) as e:
+            raise RuntimeError(f"Database update error: {str(e)}")
+    else:
+        # Reset all entries
+        try:
+            result = await DB.entry.update_many({}, {"$set": {"check_in": False, "checked_in_at": None}})
+            return result.modified_count
+        except (ConnectionError, OperationFailure) as e:
+            raise RuntimeError(f"Database update error: {str(e)}")
+
+
+async def watch_entries(websocket: WebSocket):
+    """
+    Watch for update operations on the check_in field in the entry collection and send updates to the client via WebSocket.
+
+    :param websocket: The WebSocket connection to send updates to.
+    """
+    global DB
+
+    # Define the pipeline to watch for update or replace operations
+    pipeline = [
+        {"$match": {"operationType": {"$in": ["update", "replace"]}}}
+    ]
+
+    # Watch for changes in the entry collection with mongoDB change streams
+    async with DB.entry.watch(pipeline) as stream:
+        async for change in stream:
+            # Fetch the full document
+            document_id = change["documentKey"]["_id"]
+            entry = await DB.entry.find_one({"_id": document_id})
+
+            # Send the updated entry to the client
+            if entry:
+                entry.pop("_id", None) # Remove the _id field before sending
+                await websocket.send_text(json.dumps(entry))

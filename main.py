@@ -1,8 +1,11 @@
+import asyncio
+import json
 from contextlib import asynccontextmanager
 from pickle import GLOBAL
 
 from fastapi import FastAPI, status, UploadFile, HTTPException
 from starlette.responses import StreamingResponse
+from starlette.websockets import WebSocket
 
 import database as db_handler
 
@@ -30,7 +33,7 @@ app = FastAPI(lifespan=lifespan)
             "description": "Successful response",
             "content": {"application/json": {"example": {"message": "ok"}}},
         }})
-async def root():
+async def root() -> dict[str, str]:
     """
     Root endpoint, used to test the connection to the API.
     """
@@ -44,7 +47,7 @@ async def root():
     responses={
         status.HTTP_201_CREATED: {
             "description": "Data created",
-            "content": {"application/json": {"example": {"message": "ok", "rows": 0}}},
+            "content": {"application/json": {"example": {"message": "ok", "rows": "0"}}},
         },
         status.HTTP_400_BAD_REQUEST: {
             "description": "Bad request",
@@ -54,7 +57,7 @@ async def root():
             "description": "Internal server error",
             "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
         }})
-async def import_csv(file: UploadFile):
+async def import_csv(file: UploadFile) -> dict[str, str]:
     """
     Import data from a CSV file, then store the data in a database.
 
@@ -67,7 +70,7 @@ async def import_csv(file: UploadFile):
     # Read the file and store the data in a database
     try:
         rows_imported = await db_handler.import_csv(file)
-        return {"message": "ok", "rows": rows_imported}
+        return {"message": "ok", "rows": str(rows_imported)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"{str(e)}")
     except Exception as e:
@@ -88,7 +91,7 @@ async def import_csv(file: UploadFile):
             "description": "Internal server error",
             "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
         }})
-async def export_csv():
+async def export_csv() -> StreamingResponse:
     """
     Export data from a database to a CSV file.
 
@@ -107,5 +110,82 @@ async def export_csv():
 
 
 # CHECK-IN ENDPOINT TODO: Implement check-in endpoint
+@app.post(
+    "/check-in/{entry_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Check in successful",
+            "content": {"application/json": {"example": {"message": "ok", "time": "1970-01-01T12:00:00.000000Z"}}},
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Not found",
+            "content": {"application/json": {"example": {"detail": "ID not found"}}},
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Internal server error",
+            "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
+        }})
+async def check_in(entry_id: str) -> dict[str, str]:
+    """
+    Check in the given ID.
+    """
+    # Check in the student
+    try:
+        time = await db_handler.check_in(entry_id)
+        return {"message": "ok", "time": time}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=f"{str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{str(e)}")
+
+
 # RESET ENDPOINT TODO: Implement reset endpoint, all and by nim
+@app.post(
+    "/reset",
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Reset successful",
+            "content": {"application/json": {"example": {"message": "ok", "rows": "0"}}},
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Not found",
+            "content": {"application/json": {"example": {"detail": "ID not found"}}},
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Internal server error",
+            "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
+        }})
+async def reset_check_in(entry_id: str = None) -> dict[str, str]:
+    """
+    Reset the check in status of the given ID, or all entries.
+
+    DANGEROUS ENDPOINT: Be careful when using this endpoint, because there is no backup for the data.
+    """
+    # Reset the database
+    try:
+        rows = await db_handler.reset_check_in(entry_id)
+        return {"message": "ok", "rows": str(rows)}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=f"{str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{str(e)}")
+
+
 # UPDATE WEBSOCKET ENDPOINT (OPTIONAL)
+@app.websocket("/update")
+async def update_websocket(websocket: WebSocket) -> None:
+    """
+    Update the client with the latest checked in entry.
+    """
+    # Accept the websocket connection
+    await websocket.accept()
+
+    try:
+        # Watch for updates on the check_in field
+        await db_handler.watch_entries(websocket)
+    except Exception as e:
+        # Send the error message to the client
+        await websocket.send_text(json.dumps({"error": str(e)}))
+        await websocket.close()
