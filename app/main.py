@@ -2,7 +2,8 @@ import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status, UploadFile, HTTPException
-from starlette.responses import StreamingResponse
+from starlette.requests import Request
+from starlette.responses import StreamingResponse, JSONResponse
 from starlette.websockets import WebSocket
 
 import app.database as db_handler
@@ -19,6 +20,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# Custom exception handler to change {detail} to {message}
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"message": exc.detail},
+    )
 
 
 # === ENDPOINTS ===
@@ -49,11 +59,11 @@ async def root() -> dict[str, str]:
         },
         status.HTTP_400_BAD_REQUEST: {
             "description": "Bad request",
-            "content": {"application/json": {"example": {"detail": "Validation error"}}},
+            "content": {"application/json": {"example": {"message": "Validation error"}}},
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
-            "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
+            "content": {"application/json": {"example": {"message": "Internal server error: <error message>"}}},
         }})
 async def import_csv(file: UploadFile) -> dict[str, str]:
     """
@@ -87,7 +97,7 @@ async def import_csv(file: UploadFile) -> dict[str, str]:
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
-            "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
+            "content": {"application/json": {"example": {"message": "Internal server error: <error message>"}}},
         }})
 async def export_csv() -> StreamingResponse:
     """
@@ -118,11 +128,11 @@ async def export_csv() -> StreamingResponse:
         },
         status.HTTP_404_NOT_FOUND: {
             "description": "Not found",
-            "content": {"application/json": {"example": {"detail": "ID not found"}}},
+            "content": {"application/json": {"example": {"message": "ID not found"}}},
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
-            "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
+            "content": {"application/json": {"example": {"message": "Internal server error: <error message>"}}},
         }})
 async def check_in(entry_id: str) -> dict[str, str]:
     """
@@ -140,7 +150,7 @@ async def check_in(entry_id: str) -> dict[str, str]:
 
 # RESET ENDPOINT TODO: Implement reset endpoint, all and by nim
 @app.post(
-    "/reset",
+    "/reset/{entry-id}",
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_200_OK: {
@@ -149,15 +159,17 @@ async def check_in(entry_id: str) -> dict[str, str]:
         },
         status.HTTP_404_NOT_FOUND: {
             "description": "Not found",
-            "content": {"application/json": {"example": {"detail": "ID not found"}}},
+            "content": {"application/json": {"example": {"message": "ID not found"}}},
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
-            "content": {"application/json": {"example": {"detail": "Internal server error: <error message>"}}},
+            "content": {"application/json": {"example": {"message": "Internal server error: <error message>"}}},
         }})
-async def reset_check_in(entry_id: str = None) -> dict[str, str]:
+async def reset_check_in(entry_id: str) -> dict[str, str]:
     """
     Reset the check in status of the given ID, or all entries.
+
+    use entry_id = "all" to reset all entries.
 
     DANGEROUS ENDPOINT: Be careful when using this endpoint, because there is no backup for the data.
     """

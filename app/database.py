@@ -191,11 +191,11 @@ async def check_in(entry_id: str) -> str:
         raise RuntimeError(f"Database update error: {str(e)}")
 
 
-async def reset_check_in(entry_id: str = None) -> int:
+async def reset_check_in(entry_id: str) -> int:
     """
     Reset the check in status of the given ID, or all entries.
 
-    If entry_id is None, reset all entries.
+    If entry_id is "all", reset all entries.
 
     :param entry_id: The ID to reset, or None to reset all entries.
     :return: The number of entries reset.
@@ -204,7 +204,7 @@ async def reset_check_in(entry_id: str = None) -> int:
     """
     global DB
 
-    if entry_id:
+    if entry_id != "all":
         # Find the entry with the given ID
         try:
             entry = await DB.entry.find_one({"nim": entry_id})
