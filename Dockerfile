@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY ./app /code/app
 COPY .env /code/.env
 
-# Expose the port that FastAPI will run on
-EXPOSE 80
-
 # Command to run the application
 CMD ["uvicorn", "app.main:app", "--host", "192.168.1.99", "--port", "30002"]
+
+# Run with docker run -d --name some-api-container --network host some-api
+# Replace some-api with the name of the image
