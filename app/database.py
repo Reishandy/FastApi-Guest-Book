@@ -51,7 +51,7 @@ async def import_csv(file: UploadFile) -> int:
     """
     Import a CSV file into the database.
 
-    TODO: Format of the CSV file: "nim, name, address, phone_number, email, major, study_program, generation, status"
+    Required CSV columns: "id, name"
 
     :param file: The CSV file to import.
     :return: The number of rows imported.
@@ -70,42 +70,29 @@ async def import_csv(file: UploadFile) -> int:
 
     # Use csv module to parse the content
     csv_reader = DictReader(StringIO(decoded_content))
-    expected_header = ["nim", "name", "address", "phone_number", "email", "major", "study_program", "generation",
-                       "status"]
-    expected_header_with_check_in = expected_header + ["check_in", "checked_in_at"]
-    if csv_reader.fieldnames != expected_header and csv_reader.fieldnames != expected_header_with_check_in:
-        raise ValueError("Invalid file format")
+    required_columns = {"id", "name"}
+    if not required_columns.issubset(csv_reader.fieldnames):
+        raise ValueError("Missing required columns id and/or name")
 
-    # Fetch existing nims
+    # Fetch existing ids
     try:
-        existing_nims = await DB.entry.distinct("nim")
-        existing_nims_set = set(existing_nims)
+        existing_ids = await DB.entry.distinct("id")
+        existing_ids_set = set(existing_ids)
     except (ConnectionError, OperationFailure) as e:
         raise RuntimeError(f"Database query error: {str(e)}")
 
     # Parse the rows and filter out existing entries
     documents = []
     for row in csv_reader:
-        nim = row["nim"]
-        if nim in existing_nims_set:
+        if row["id"] in existing_ids_set:
             continue  # Skip if the entry already exists
 
         documents.append({
-            "nim": nim, # This is the ID used to identify entry and used to check in
-
-            # This data is can be changed or removed entirely
+            "id": row["id"],
             "name": row["name"],
-            "address": row["address"],
-            "phone_number": row["phone_number"],
-            "email": row["email"],
-            "major": row["major"],
-            "study_program": row["study_program"],
-            "generation": row["generation"],
-            "status": row["status"],
-
-            # This is check in data
-            "check_in": row.get("check_in", "") or False,
-            "checked_in_at": row.get("checked_in_at", "") or None
+            "check_in": row.get("check_in", False),
+            "checked_in_at": row.get("checked_in_at", None)
+            # INFO: Add other fields here if needed
         })
 
     # Insert the documents into the database
@@ -122,7 +109,7 @@ async def export_csv() -> StringIO:
     """
     Export data from the database to a CSV file.
 
-    TODO: Format of the CSV file: "nim, name, address, phone_number, email, major, study_program, generation, status, check_in, checked_in_at"
+    Exported CSV will have the following columns: "id, name, check_in, checked_in_at"
 
     :return: The CSV file as a StringIO object.
     """
@@ -138,21 +125,13 @@ async def export_csv() -> StringIO:
     # Create CSV data
     output = StringIO()
     csv_writer = writer(output)
-    csv_writer.writerow(["nim", "name", "address", "phone_number", "email", "major", "study_program",
-                         "generation", "status", "check_in", "checked_in_at"])
+    csv_writer.writerow(["id", "name", "check_in", "checked_in_at"])
 
     # Write the entries to the CSV file
     for entry in entries:
         csv_writer.writerow([
-            entry.get("nim", ""),
+            entry.get("id", ""),
             entry.get("name", ""),
-            entry.get("address", ""),
-            entry.get("phone_number", ""),
-            entry.get("email", ""),
-            entry.get("major", ""),
-            entry.get("study_program", ""),
-            entry.get("generation", ""),
-            entry.get("status", ""),
             entry.get("check_in", ""),
             entry.get("checked_in_at", "")
         ])
@@ -174,7 +153,7 @@ async def check_in(entry_id: str) -> str:
 
     # Find the entry with the given ID
     try:
-        entry = await DB.entry.find_one({"nim": entry_id})
+        entry = await DB.entry.find_one({"id": entry_id})
     except (ConnectionError, OperationFailure) as e:
         raise RuntimeError(f"Database query error: {str(e)}")
 
@@ -185,7 +164,7 @@ async def check_in(entry_id: str) -> str:
     # Check in the student
     try:
         time = datetime.now().isoformat()
-        await DB.entry.update_one({"nim": entry_id}, {"$set": {"check_in": True, "checked_in_at": time}})
+        await DB.entry.update_one({"id": entry_id}, {"$set": {"check_in": True, "checked_in_at": time}})
         return time
     except (ConnectionError, OperationFailure) as e:
         raise RuntimeError(f"Database update error: {str(e)}")
@@ -207,7 +186,7 @@ async def reset_check_in(entry_id: str) -> int:
     if entry_id != "all":
         # Find the entry with the given ID
         try:
-            entry = await DB.entry.find_one({"nim": entry_id})
+            entry = await DB.entry.find_one({"id": entry_id})
         except (ConnectionError, OperationFailure) as e:
             raise RuntimeError(f"Database query error: {str(e)}")
 
@@ -217,7 +196,7 @@ async def reset_check_in(entry_id: str) -> int:
 
         # Reset the check in status
         try:
-            await DB.entry.update_one({"nim": entry_id}, {"$set": {"check_in": False, "checked_in_at": None}})
+            await DB.entry.update_one({"id": entry_id}, {"$set": {"check_in": False, "checked_in_at": None}})
             return 1
         except (ConnectionError, OperationFailure) as e:
             raise RuntimeError(f"Database update error: {str(e)}")
