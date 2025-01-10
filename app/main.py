@@ -150,7 +150,7 @@ async def check_in(entry_id: str) -> dict[str, str]:
 
 # RESET ENDPOINT TODO: Implement reset endpoint, all and by nim
 @app.post(
-    "/reset/{entry-id}",
+    "/reset/{entry_id}",
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_200_OK: {
