@@ -92,8 +92,9 @@ async def import_csv(file: UploadFile) -> dict[str, str]:
         status.HTTP_200_OK: {
             "description": "Data exported",
             "content": {"text/csv": {
-                "example": "nim,name,address,phone_number,email,major,study_program,generation,status,check_in,checked_in_at\n"
-                           "12345,John Doe,123 Main St,555-1234,john.doe@example.com,Computer Science,CS,2020,active,True,2023-10-01T12:00:00Z\n"}}
+                "example": "id,name,check_in,checked_in_at\n"
+                           "12345,John Doe,True,2023-10-01T12:00:00Z\n"
+                           "67890,Reishandy,False,\n"}}
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
