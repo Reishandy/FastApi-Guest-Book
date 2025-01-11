@@ -73,7 +73,7 @@ async def import_csv(file: UploadFile) -> dict[str, str]:
     """
     # Check if the file is a CSV file
     if file.content_type != "text/csv":
-        raise HTTPException(status_code=400, detail="File must be text/csv")
+        raise HTTPException(status_code=400, detail="File must be a CSV file")
 
     # Read the file and store the data in a database
     try:
