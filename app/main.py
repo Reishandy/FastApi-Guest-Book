@@ -118,7 +118,7 @@ async def export_csv() -> StreamingResponse:
         raise HTTPException(status_code=500, detail=f"{str(e)}")
 
 
-# CHECK-IN ENDPOINT TODO: Implement check-in endpoint
+# CHECK-IN ENDPOINT
 @app.post(
     "/check-in/{entry_id}",
     status_code=status.HTTP_200_OK,
@@ -149,7 +149,7 @@ async def check_in(entry_id: str) -> dict[str, str]:
         raise HTTPException(status_code=500, detail=f"{str(e)}")
 
 
-# RESET ENDPOINT TODO: Implement reset endpoint, all and by nim
+# RESET ENDPOINT
 @app.post(
     "/reset/{entry_id}",
     status_code=status.HTTP_200_OK,
