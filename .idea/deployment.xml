@@ -10,6 +10,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="rx23-server-online">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/FastApi-Guest-Book" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
     </serverData>
   </component>
 </project>
