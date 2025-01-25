@@ -74,19 +74,9 @@ async def import_csv(file: UploadFile) -> int:
     if not required_columns.issubset(csv_reader.fieldnames):
         raise ValueError("Missing required columns id and/or name")
 
-    # Fetch existing ids
-    try:
-        existing_ids = await DB.entry.distinct("id")
-        existing_ids_set = set(existing_ids)
-    except (ConnectionError, OperationFailure) as e:
-        raise RuntimeError(f"Database query error: {str(e)}")
-
-    # Parse the rows and filter out existing entries
+    # Parse the rows and update or insert entries
     documents = []
     for row in csv_reader:
-        if row["id"] in existing_ids_set:
-            continue  # Skip if the entry already exists
-
         documents.append({
             "id": row["id"],
             "name": row["name"],
@@ -95,12 +85,11 @@ async def import_csv(file: UploadFile) -> int:
             # INFO: Add other fields here if needed
         })
 
-    # Insert the documents into the database
+    # Insert or update the documents in the database
     try:
-        if documents:
-            result = await DB.entry.insert_many(documents)
-            return len(result.inserted_ids)
-        return 0
+        for doc in documents:
+            await DB.entry.update_one({"id": doc["id"]}, {"$set": doc}, upsert=True)
+        return len(documents)
     except (ConnectionError, OperationFailure, DuplicateKeyError, InvalidDocument) as e:
         raise RuntimeError(f"Database insertion error: {str(e)}")
 
