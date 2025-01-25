@@ -154,7 +154,7 @@ async def check_in(entry_id: str) -> str:
     if entry.get("check_in", False):
         raise ValueError("Already checked in")
 
-    # Check in the student
+    # Check in the entry
     try:
         time = datetime.now().isoformat()
         await DB.entry.update_one({"id": entry_id}, {"$set": {"check_in": True, "checked_in_at": time}})
