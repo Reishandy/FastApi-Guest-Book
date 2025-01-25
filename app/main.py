@@ -131,6 +131,10 @@ async def export_csv() -> StreamingResponse:
             "description": "Not found",
             "content": {"application/json": {"example": {"message": "ID not found"}}},
         },
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Bad request",
+            "content": {"application/json": {"example": {"message": "Already checked in"}}},
+        },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "description": "Internal server error",
             "content": {"application/json": {"example": {"message": "Internal server error: <error message>"}}},
@@ -144,7 +148,12 @@ async def check_in(entry_id: str) -> dict[str, str]:
         time = await db_handler.check_in(entry_id)
         return {"message": "ok", "time": time}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=f"{str(e)}")
+        if str(e) == "ID not found":
+            raise HTTPException(status_code=404, detail="ID not found")
+        elif str(e) == "Already checked in":
+            raise HTTPException(status_code=400, detail="Already checked in")
+        else:
+            raise HTTPException(status_code=500, detail=f"{str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"{str(e)}")
 

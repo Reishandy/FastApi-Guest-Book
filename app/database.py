@@ -150,6 +150,10 @@ async def check_in(entry_id: str) -> str:
     if not entry:
         raise ValueError("ID not found")
 
+    # Check if the entry is already checked in
+    if entry.get("check_in", False):
+        raise ValueError("Already checked in")
+
     # Check in the student
     try:
         time = datetime.now().isoformat()
