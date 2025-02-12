@@ -1,6 +1,7 @@
 import json
 from csv import DictReader, writer
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from io import StringIO
 from os import getenv
 from urllib.parse import quote_plus
@@ -125,7 +126,7 @@ async def export_csv() -> StringIO:
             entry.get("checked_in_at", "")
         ])
 
-    output.seek(0) # Move the cursor to the beginning of the file
+    output.seek(0)  # Move the cursor to the beginning of the file
     return output
 
 
@@ -156,7 +157,7 @@ async def check_in(entry_id: str) -> str:
 
     # Check in the entry
     try:
-        time = datetime.now().isoformat()
+        time = datetime.now().astimezone(ZoneInfo("Asia/Jakarta")).isoformat()
         await DB.entry.update_one({"id": entry_id}, {"$set": {"check_in": True, "checked_in_at": time}})
         return time
     except (ConnectionError, OperationFailure) as e:
@@ -224,5 +225,5 @@ async def watch_entries(websocket: WebSocket):
 
             # Send the updated entry to the client
             if entry:
-                entry.pop("_id", None) # Remove the _id field before sending
+                entry.pop("_id", None)  # Remove the _id field before sending
                 await websocket.send_text(json.dumps(entry))
