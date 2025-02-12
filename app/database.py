@@ -157,6 +157,7 @@ async def check_in(entry_id: str) -> str:
 
     # Check in the entry
     try:
+        # INFO: Change the timezone to your local timezone
         time = datetime.now().astimezone(ZoneInfo("Asia/Jakarta")).isoformat()
         await DB.entry.update_one({"id": entry_id}, {"$set": {"check_in": True, "checked_in_at": time}})
         return time
