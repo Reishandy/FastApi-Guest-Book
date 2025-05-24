@@ -15,7 +15,7 @@ COPY ./app /code/app
 COPY .env /code/.env
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "192.168.1.99", "--port", "30002"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "30002"]
 
 # Run with docker run -d --name some-api-container --network host some-api
 # Replace some-api with the name of the image
